@@ -72,6 +72,12 @@ Emisser.prototype._handleEmissionToNewListener= (function emissionToNewListener(
 					if(self._hold.length){
 						// shift off of _hold
 						var record= self._hold.shift()
+
+						// put in record
+						var storeRecord= [record[0], _slice.call(record, 1), null]
+						self._store.push([storeRecord])
+
+						// emit
 						self.emit.apply(self, record)
 					}else{
 						// done, shut down
@@ -122,18 +128,23 @@ function dispatch(self, record, listenerSet){
 }
 
 Emisser.prototype.emit= (function emit(name, a, b, c){
-	var oldest= this._oldest
-	if(oldest == -1 || oldest >= this._store.length){
-		// no replaying in progress, emit now
-		_call(_emit, this, arguments, name, a, b, c)
-		// record for latecomers
-		var record= [name,_slice.call(arguments, 1),null]
-		this._store.push(record)
-	}else{
-		// replay in progress, defer
-		var record= _slice.call(arguments, 0)
-		this._hold.push(record)
+	var noOld = this._oldest === -1,
+	  noHold= this._hold.length === 0
+	if(noOld || !noHold){
+		// no old, either getting held or getting done
+		if(noHold){
+			// no replaying in progress, emit now
+			_call(_emit, this, arguments, name, a, b, c)
+		}else{
+			// holding in progress
+			var record= _slice.call(arguments, 0)
+			this._hold.push(record)
+			return
+		}
 	}
+	// store
+	var record= [name,_slice.call(arguments, 1),null]
+	this._store.push(record)
 })
 
 function _call(fn, self, args, a, b, c, d){
