@@ -9,7 +9,6 @@ function Emisser(){
 
 	/// Long term storage for Emitted events
 	var _store= [],
-	  _hold= [],
 	  _oldest= -1
 	Object.defineProperty(this, '_store', {
 		get: function(){
@@ -17,14 +16,6 @@ function Emisser(){
 		},
 		set: function(val){
 			_store= val
-		}
-	})
-	Object.defineProperty(this, '_hold', {
-		get: function(){
-			return _hold
-		},
-		set: function(val){
-			_hold= val
 		}
 	})
 	Object.defineProperty(this, '_oldest', {
@@ -48,8 +39,9 @@ inherits(Emisser, EventEmitter)
 Emisser.prototype._handleEmissionToNewListener= (function emissionToNewListener(name, listener){
 
 	// check for store
-	if(!this._store.length)
+	if(!this._store.length){
 		return
+	}
 
 	// add to beginning of store
 	var storeStart= this._store[0]
@@ -57,7 +49,7 @@ Emisser.prototype._handleEmissionToNewListener= (function emissionToNewListener(
 	queue.push(name, listener)
 
 	// check for replayer
-	var needReplayer= this._oldest == -1
+	var needReplayer= this._oldest === -1
 	// reset replayer
 	this._oldest= 0
 	// run replayer if not running
@@ -67,23 +59,11 @@ Emisser.prototype._handleEmissionToNewListener= (function emissionToNewListener(
 		function replay(){
 			while(1){
 				var oldest= self._oldest
-				if(oldest >= self._store.length){
+				if(oldest >= self._store.length || oldest === -1){
 					// nothing left in store to send
-					if(self._hold.length){
-						// shift off of _hold
-						var record= self._hold.shift()
-
-						// put in record
-						var storeRecord= [record[0], _slice.call(record, 1), null]
-						self._store.push([storeRecord])
-
-						// emit
-						self.emit.apply(self, record)
-					}else{
-						// done, shut down
-						self._oldest= -1
-						clearInterval(interval)
-					}
+					// done, shut down
+					self._oldest= -1
+					clearInterval(interval)
 					return
 				}else{
 					// this pass will get us one-less old in our replaying of store
@@ -120,7 +100,7 @@ Emisser.prototype._handleEmissionToNewListener= (function emissionToNewListener(
 // run listener set, which is zipped up name,listener pairs
 function dispatch(self, record, listenerSet){
 	for(var i in listenerSet){
-		if(listenerSet[i++] == record[0]){
+		if(listenerSet[i++] === record[0]){
 			var listener= listenerSet[i]
 			listener.apply(self, record[1])
 		}
@@ -128,35 +108,29 @@ function dispatch(self, record, listenerSet){
 }
 
 Emisser.prototype.emit= (function emit(name, a, b, c){
-	var noOld = this._oldest === -1,
-	  noHold= this._hold.length === 0
-	if(noOld || !noHold){
-		// no old, either getting held or getting done
-		if(noHold){
-			// no replaying in progress, emit now
-			_call(_emit, this, arguments, name, a, b, c)
-		}else{
-			// holding in progress
-			var record= _slice.call(arguments, 0)
-			this._hold.push(record)
-			return
-		}
-	}
 	// store
 	var record= [name,_slice.call(arguments, 1),null]
 	this._store.push(record)
+
+	var noOld = this._oldest === -1
+	if(noOld){
+		// no replaying in progress, emit now
+		_call(_emit, this, arguments, name, a, b, c)
+	}else if(name === 'newListener'){
+		this._handleEmissionToNewListener(a, b)
+	}
 })
 
 function _call(fn, self, args, a, b, c, d){
-	if(args.length == 1){
+	if(args.length === 1){
 		return fn.call(self, a)
-	}else if(args.length == 2){
+	}else if(args.length === 2){
 		return fn.call(self, a, b)
-	}else if(args.length == 0){
+	}else if(args.length === 0){
 		return fn.call(self)
-	}else if(args.length == 3){
+	}else if(args.length === 3){
 		return fn.call(self, a, b, c)
-	}else if(args.length == 4){
+	}else if(args.length === 4){
 		return fn.call(self, a, b, c, d)
 	}else{
 		return fn.apply(self, args)
