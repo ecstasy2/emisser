@@ -45,11 +45,12 @@ tape('Emisser is an ok event emitter', function(t){
 
 	var e1= new emisser()
 
-	var h1= _expect(t, 'data'),
-	  h2= _expect(t, ['data', 'moo'])
+	var h1= _expect(t, 'data', 'h1 expects item'),
+	  h2= _expect(t, ['data', 'moo'], 'h2 expects item')
 
 	e1.on('data', h1)
 	e1.on('data', h2)
+	e1.on('data', function(){})
 	e1.on('moo', h2)
 
 	feed(e1)
