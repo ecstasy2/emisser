@@ -8,7 +8,9 @@ function Emisser(){
 	EventEmitter.call(this)
 
 	/// Long term storage for Emitted events
-	var _store= {}
+	var _store= [],
+	  _hold= [],
+	  _oldest= -1
 	Object.defineProperty(this, '_store', {
 		get: function(){
 			return _store
@@ -17,61 +19,121 @@ function Emisser(){
 			_store= val
 		}
 	})
-
-	var self= this,
-	  _nexts= {},
-	  _nexting= false
-	/// Emit all _nexts, which are in-flight listeners needing their data
-	function emitToNexts(){
-		var nexts= _nexts
-		_nexts= {}
-		_nexting= false
-
-		for(var name in nexts){
-			var listeners= nexts[name]
-			for(var i in self._store[name]){
-				for(var j in listeners){
-					listeners[j].apply(self, _store[i])
-				}
-			}
-		}
-		if(Object.keys(_next).length > 0 && !_nexting){
-			_nexting= true
-			setTimeout(emitToNexts, 0)
-		}
-	}
-
-	/// New listeners
-	// define emission
-	function emissionToNewListener(name, listener){
-		if(!_store[name])
-			return
-		_nexts[name].push(listener)
-		if(!_nexting){
-			_nexting= true
-			setTimeout(emitToNexts, 0)
-		}
-	}
-	// make a variable for mission
-	Object.defineProperty(this, 'handleEmissionToNewListener', {
+	Object.defineProperty(this, '_hold', {
 		get: function(){
-			return emissionToNewListener
+			return _hold
 		},
 		set: function(val){
-			emissionToNewListener= val
+			_hold= val
 		}
 	})
-	this.on('newListener', function(a, b, c, d){
-		_call(emissionToNewListener, this, arguments, a, b, c, d)
+	Object.defineProperty(this, '_oldest', {
+		get: function(){
+			return _oldest
+		},
+		set: function(val){
+			_oldest= val
+		}
+	})
+
+	
+
+	/// New listeners
+	this.on('newListener', function(name, b, c, d){
+		_call(this._handleEmissionToNewListener, this, arguments, name, b, c, d)
 	})
 }
 inherits(Emisser, EventEmitter)
 
+Emisser.prototype._handleEmissionToNewListener= (function emissionToNewListener(name, listener){
+
+	// check for store
+	if(!this._store.length)
+		return
+
+	// add to beginning of store
+	var storeStart= this._store[0]
+	  queue= storeStart[2]|| (storeStart[2]= [])
+	queue.push(name, listener)
+
+	// check for replayer
+	var needReplayer= this._oldest == -1
+	// reset replayer
+	this._oldest= 0
+	// run replayer if not running
+	if(needReplayer){
+		var self= this,
+		  interval
+		function replay(){
+			while(1){
+				var oldest= self._oldest
+				if(oldest >= self._store.length){
+					// nothing left in store to send
+					if(self._hold.length){
+						// shift off of _hold
+						var record= self._hold.shift()
+						self.emit.apply(self, record)
+					}else{
+						// done, shut down
+						self._oldest= -1
+						clearInterval(interval)
+					}
+					return
+				}else{
+					// this pass will get us one-less old in our replaying of store
+					++self._oldest
+				}
+
+				//  pick out record's listenerSet, make sure it exists
+				var record= self._store[oldest]
+				var listenerSet= record[2]
+				record[2]= null
+				if(!listenerSet || !listenerSet.length)
+					// apparently someone external has cleaned listeners out of the store?
+					continue
+
+				// move all listeners into next recordSet
+				var next= self._store[oldest+1]
+				if(!next){
+				}else if(next[2]){
+					next[2]= next[2].concat(listenerSet)
+				}else{
+					next[2]= listenerSet
+				}
+
+				// run the record against the listeners
+				dispatch(self, record, listenerSet)
+				return
+			}
+			
+		}
+		interval= setInterval(replay , 0)
+	}
+})
+
+// run listener set, which is zipped up name,listener pairs
+function dispatch(self, record, listenerSet){
+	for(var i in listenerSet){
+		if(listenerSet[i++] == record[0]){
+			var listener= listenerSet[i]
+			listener.apply(self, record[1])
+		}
+	}
+}
+
 Emisser.prototype.emit= (function emit(name, a, b, c){
-	var args= _slice.call(arguments, 0),
-	  arr= this._store[name] || (this._store[name] = [])
-	arr.push(args)
-	return _call(_emit, this, args, name, a, b, c)	
+	var oldest= this._oldest
+	if(oldest == -1 || oldest >= this._store.length){
+		// no replaying in progress, emit now
+		_call(_emit, this, arguments, name, a, b, c)
+		// record for latecomers
+		var record= [name,_slice.call(arguments, 1),null]
+		this._store.push(record)
+	}else{
+		// replay in progress, defer
+		var record= _slice.call(arguments, 0)
+		this._hold.push(record)
+	}
 })
 
 function _call(fn, self, args, a, b, c, d){

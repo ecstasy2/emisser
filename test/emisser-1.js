@@ -28,8 +28,8 @@ function _expect(t, eventNames, description, unhandled){
 			if(!~eventNames.indexOf(fix[0]))
 				fix= null
 		}
-		fix= fix.slice(1)
 		var args= _slice.call(arguments, 0)
+		fix= fix.slice(1)
 		t.deepEquals(args, fix, description || 'expected an item from fixture')
 	}
 }
@@ -53,4 +53,25 @@ tape('Emisser is an ok event emitter', function(t){
 	e1.on('moo', h2)
 
 	feed(e1)
+})
+
+tape('Emisser is an ok event emitter', function(t){
+	t.plan(7)
+
+	var e1= new emisser()
+
+	var h1= _expect(t, 'data', 'h1 expected an item'),
+	  h2= _expect(t, ['data', 'moo'], 'h2 expected an item')
+
+	feed(e1)
+
+
+	e1.on('moo', function(){})
+	e1.on('data', h1)
+	e1.on('moo', function(){})
+	e1.on('data', h2)
+	e1.on('data', function(){})
+	e1.on('moo', function(){})
+	e1.on('moo', h2)
+
 })
