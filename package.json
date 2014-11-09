@@ -1,0 +1,27 @@
+{
+	"name": "emisser",
+	"version": "1.0.0",
+	"description": "Emisser : Event :: Generator : Callback",
+	"main": "emisser.js",
+	"directories": {
+		"test": "test"
+	},
+	"dependencies": {
+		"inherits": "^2.0.1",
+		"tape": "^3.0.2"
+	},
+	"devDependencies": {},
+	"scripts": {
+		"test": "tape test/*js"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/rektide/emisser.git"
+	},
+	"author": "rektide de la faye <rektide@voodoowarez.com>",
+	"license": "X",
+	"bugs": {
+		"url": "https://github.com/rektide/emisser/issues"
+	},
+	"homepage": "https://github.com/rektide/emisser"
+}
